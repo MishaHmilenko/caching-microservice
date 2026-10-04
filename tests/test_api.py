@@ -1,7 +1,6 @@
 import pytest
 from fastapi.testclient import TestClient
 
-from cache_service.config import Settings
 from cache_service.main import create_app
 
 SAMPLE = {
@@ -11,9 +10,8 @@ SAMPLE = {
 
 
 @pytest.fixture
-def client(transformer, tmp_path):
-    settings = Settings(database_url=f"sqlite:///{tmp_path}/nested/cache.db")
-    with TestClient(create_app(settings, transformer)) as client:
+def client(transformer, redis_client):
+    with TestClient(create_app(transformer=transformer, redis_client=redis_client)) as client:
         yield client
 
 
@@ -56,11 +54,11 @@ def test_invalid_input_is_rejected(client, transformer, body):
     assert transformer.calls == []
 
 
-def test_cache_persists_across_app_restarts(transformer, tmp_path):
-    settings = Settings(database_url=f"sqlite:///{tmp_path}/cache.db")
-    with TestClient(create_app(settings, transformer)) as first:
+def test_cache_is_shared_across_app_instances(transformer, redis_client):
+    """A second app on the same Redis stands in for a restart or another replica."""
+    with TestClient(create_app(transformer=transformer, redis_client=redis_client)) as first:
         id_ = first.post("/payload", json=SAMPLE).json()["id"]
-    with TestClient(create_app(settings, transformer)) as second:
+    with TestClient(create_app(transformer=transformer, redis_client=redis_client)) as second:
         assert second.post("/payload", json=SAMPLE).json()["id"] == id_
         assert second.get(f"/payload/{id_}").status_code == 200
 

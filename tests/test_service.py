@@ -1,12 +1,11 @@
 import pytest
-from sqlmodel import Session
 
 from cache_service.service import PayloadService, payload_id
 
 
 @pytest.fixture
-def service(session, transformer) -> PayloadService:
-    return PayloadService(session, transformer)
+def service(store, transformer) -> PayloadService:
+    return PayloadService(store, transformer)
 
 
 def test_output_interleaves_transformed_strings(service):
@@ -52,18 +51,16 @@ def test_fully_cached_strings_in_new_combination_skip_transformer(service, trans
     assert service.get_output(id_) == "D, B, C, A"
 
 
-def test_cache_survives_new_session(engine, transformer):
-    with Session(engine) as first:
-        id_, _ = PayloadService(first, transformer).create(["a"], ["b"])
-    with Session(engine) as second:
-        PayloadService(second, transformer).create(["a"], ["c"])
+def test_cache_is_shared_between_service_instances(store, transformer):
+    id_, _ = PayloadService(store, transformer).create(["a"], ["b"])
+    PayloadService(store, transformer).create(["a"], ["c"])
 
     assert transformer.calls == [["a", "b"], ["c"]]
     assert id_
 
 
-def test_transformer_result_count_mismatch_is_rejected(session):
-    service = PayloadService(session, lambda strings: [])
+def test_transformer_result_count_mismatch_is_rejected(store):
+    service = PayloadService(store, lambda strings: [])
 
     with pytest.raises(RuntimeError):
         service.create(["a"], ["b"])

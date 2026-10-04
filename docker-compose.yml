@@ -1,10 +1,19 @@
 services:
+  redis:
+    image: redis:7-alpine
+    # Append-only file so the cache survives restarts.
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis-data:/data
+
   cache:
     build: .
+    environment:
+      CACHE_REDIS_URL: redis://redis:6379/0
     ports:
       - "8000:8000"
-    volumes:
-      - cache-data:/data
+    depends_on:
+      - redis
 
 volumes:
-  cache-data:
+  redis-data:

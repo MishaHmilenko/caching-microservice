@@ -1,9 +1,9 @@
-from collections.abc import Iterator, Sequence
+from collections.abc import Sequence
 
+import fakeredis
 import pytest
-from sqlmodel import Session
 
-from cache_service.db import create_db_engine, create_tables
+from cache_service.store import RedisStore
 from cache_service.transformer import uppercase_transformer
 
 
@@ -19,16 +19,13 @@ class CountingTransformer:
 
 
 @pytest.fixture
-def engine():
-    engine = create_db_engine("sqlite://")
-    create_tables(engine)
-    return engine
+def redis_client():
+    return fakeredis.FakeRedis(decode_responses=True)
 
 
 @pytest.fixture
-def session(engine) -> Iterator[Session]:
-    with Session(engine) as session:
-        yield session
+def store(redis_client) -> RedisStore:
+    return RedisStore(redis_client)
 
 
 @pytest.fixture

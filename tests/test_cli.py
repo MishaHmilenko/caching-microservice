@@ -8,7 +8,6 @@ from pydantic_settings import CliApp
 
 from cache_cli.main import main, run
 from cache_cli.settings import CliSettings
-from cache_service.config import Settings
 from cache_service.main import create_app
 
 BODY = {"list_1": ["a", "b"], "list_2": ["c", "d"]}
@@ -19,9 +18,8 @@ def parse(*args: str) -> CliSettings:
 
 
 @pytest.fixture
-def client(transformer, tmp_path):
-    settings = Settings(database_url=f"sqlite:///{tmp_path}/cache.db")
-    with TestClient(create_app(settings, transformer)) as client:
+def client(transformer, redis_client):
+    with TestClient(create_app(transformer=transformer, redis_client=redis_client)) as client:
         yield client
 
 

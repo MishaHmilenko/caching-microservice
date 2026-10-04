@@ -12,11 +12,9 @@ RUN uv sync --frozen --no-dev --no-install-project
 COPY src ./src
 RUN uv sync --frozen --no-dev
 
-# Run unprivileged; /data holds the SQLite file and is meant to be a volume.
-RUN useradd --system --create-home app && mkdir /data && chown app /data
+# Run unprivileged.
+RUN useradd --system --create-home app
 USER app
-ENV CACHE_DATABASE_URL=sqlite:////data/cache.db
-VOLUME /data
 
 EXPOSE 8000
 HEALTHCHECK CMD python -c "import urllib.request as u; u.urlopen('http://localhost:8000/health')"
