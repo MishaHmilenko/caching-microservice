@@ -6,4 +6,7 @@ class Settings(BaseSettings):
 
     model_config = SettingsConfigDict(env_prefix="CACHE_")
 
+    database_url: str = "postgresql+asyncpg://cache:cache@localhost:5432/cache"
     redis_url: str = "redis://localhost:6379/0"
+    # Postgres is the source of truth, so cache entries can safely expire.
+    cache_ttl_seconds: int = 3600
