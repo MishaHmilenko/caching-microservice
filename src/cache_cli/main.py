@@ -9,7 +9,7 @@ from pydantic import ValidationError
 from pydantic_settings import CliApp
 
 from cache_cli.settings import STDIO, CliSettings
-from cache_service.schemas import PayloadRequest
+from cache_service.api.schemas import PayloadRequest
 
 REQUEST_TIMEOUT_SECONDS = 10
 

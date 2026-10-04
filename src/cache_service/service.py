@@ -2,8 +2,7 @@ import hashlib
 import json
 from collections.abc import Sequence
 
-from cache_service.store import RedisStore
-from cache_service.transformer import Transformer
+from cache_service.interfaces import PayloadRepository, StringRepository, Transformer
 
 OUTPUT_SEPARATOR = ", "
 
@@ -19,38 +18,44 @@ def interleave(first: Sequence[str], second: Sequence[str]) -> list[str]:
 
 
 class PayloadService:
-    def __init__(self, store: RedisStore, transformer: Transformer) -> None:
-        self._store = store
+    def __init__(
+        self,
+        strings: StringRepository,
+        payloads: PayloadRepository,
+        transformer: Transformer,
+    ) -> None:
+        self._strings = strings
+        self._payloads = payloads
         self._transformer = transformer
 
-    def get_output(self, id_: str) -> str | None:
-        return self._store.get_payload(id_)
+    async def get_output(self, id_: str) -> str | None:
+        return await self._payloads.get(id_)
 
-    def create(self, list_1: Sequence[str], list_2: Sequence[str]) -> tuple[str, bool]:
+    async def create(self, list_1: Sequence[str], list_2: Sequence[str]) -> tuple[str, bool]:
         """Return the payload id and whether it was newly created."""
         id_ = payload_id(list_1, list_2)
-        if self._store.get_payload(id_) is not None:
+        if await self._payloads.get(id_) is not None:
             return id_, False
 
-        results = self._transform_with_cache([*list_1, *list_2])
+        results = await self._transform_with_cache([*list_1, *list_2])
         output = OUTPUT_SEPARATOR.join(
             interleave([results[s] for s in list_1], [results[s] for s in list_2])
         )
-        self._store.set_payload(id_, output)
-        return id_, True
+        created = await self._payloads.save(id_, output)
+        return id_, created
 
-    def _transform_with_cache(self, strings: Sequence[str]) -> dict[str, str]:
+    async def _transform_with_cache(self, strings: Sequence[str]) -> dict[str, str]:
         """Map every distinct input to its transformed value, calling the transformer at most
         once, and only for strings that have never been seen."""
         distinct = list(dict.fromkeys(strings))
-        results = self._store.get_strings(distinct)
+        results = await self._strings.get_many(distinct)
 
         missing = [s for s in distinct if s not in results]
         if missing:
-            transformed = self._transformer(missing)
+            transformed = await self._transformer.transform(missing)
             if len(transformed) != len(missing):
                 raise RuntimeError("Transformer returned a different number of results")
             fresh = dict(zip(missing, transformed, strict=True))
-            self._store.set_strings(fresh)
+            await self._strings.save_many(fresh)
             results.update(fresh)
         return results

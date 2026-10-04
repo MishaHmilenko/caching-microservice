@@ -4,7 +4,7 @@ from typing import Self
 from pydantic import AliasChoices, AnyHttpUrl, Field, PositiveInt, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from cache_service.schemas import PayloadRequest
+from cache_service.api.schemas import PayloadRequest
 
 STDIO = Path("-")
 
