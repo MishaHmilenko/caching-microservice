@@ -61,6 +61,14 @@ async def test_unknown_payload_is_404(client):
     assert (await client.get("/payload/nope")).status_code == 404
 
 
+async def test_length_mismatch_is_rejected_by_business_rule(client, transformer):
+    response = await client.post("/payload", json={"list_1": ["a"], "list_2": ["b", "c"]})
+
+    assert response.status_code == 422
+    assert response.json() == {"detail": "list_1 and list_2 must have the same length"}
+    assert transformer.calls == []
+
+
 @pytest.mark.parametrize(
     "body",
     [

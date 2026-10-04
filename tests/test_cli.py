@@ -30,6 +30,7 @@ def test_short_and_long_flags_are_equivalent():
         ["-j", json.dumps(BODY), "-i", "-"],
         ["-j", "not json"],
         ["-j", json.dumps({"list_1": ["a"], "list_2": []})],
+        ["-j", json.dumps({"list_1": ["a"], "list_2": ["b", "c"]})],
         ["-j", json.dumps(BODY), "-r", "0"],
         ["-j", json.dumps(BODY), "-H", "not a url"],
         ["-i", "/does/not/exist.json"],
@@ -38,6 +39,14 @@ def test_short_and_long_flags_are_equivalent():
 def test_invalid_arguments_are_rejected(args):
     with pytest.raises((ValidationError, SystemExit)):
         parse(*args)
+
+
+def test_length_mismatch_in_input_file_fails_before_any_request(tmp_path, capsys):
+    request_file = tmp_path / "in.json"
+    request_file.write_text(json.dumps({"list_1": ["a"], "list_2": ["b", "c"]}))
+
+    assert main(["-i", str(request_file), "-H", "http://127.0.0.1:1"]) == 1
+    assert "same length" in capsys.readouterr().err
 
 
 def test_repeat_returns_same_id_each_iteration(live_server_url, capsys):

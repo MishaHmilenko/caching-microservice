@@ -1,7 +1,7 @@
 from collections.abc import Sequence
 
 from cache_service.domain.interfaces import PayloadRepository, StringRepository, Transformer
-from cache_service.domain.payload import OUTPUT_SEPARATOR, interleave, payload_id
+from cache_service.domain.payload import OUTPUT_SEPARATOR, interleave, payload_id, validate_lists
 
 
 class PayloadService:
@@ -19,7 +19,11 @@ class PayloadService:
         return await self._payloads.get(id_)
 
     async def create(self, list_1: Sequence[str], list_2: Sequence[str]) -> tuple[str, bool]:
-        """Return the payload id and whether it was newly created."""
+        """Return the payload id and whether it was newly created.
+
+        Raises InvalidPayloadError if the lists cannot be combined.
+        """
+        validate_lists(list_1, list_2)
         id_ = payload_id(list_1, list_2)
         if await self._payloads.get(id_) is not None:
             return id_, False

@@ -7,6 +7,16 @@ from collections.abc import Sequence
 OUTPUT_SEPARATOR = ", "
 
 
+class InvalidPayloadError(ValueError):
+    """The inputs cannot form a payload."""
+
+
+def validate_lists(list_1: Sequence[str], list_2: Sequence[str]) -> None:
+    # Interleaving pairs items up, so a length mismatch would silently drop data.
+    if len(list_1) != len(list_2):
+        raise InvalidPayloadError("list_1 and list_2 must have the same length")
+
+
 def payload_id(list_1: Sequence[str], list_2: Sequence[str]) -> str:
     """Derive the identifier from the inputs so identical requests share one payload."""
     canonical = json.dumps([list(list_1), list(list_2)], ensure_ascii=False, separators=(",", ":"))

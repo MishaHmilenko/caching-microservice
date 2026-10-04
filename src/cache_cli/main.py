@@ -10,17 +10,22 @@ from pydantic_settings import CliApp
 
 from cache_cli.settings import STDIO, CliSettings
 from cache_service.api.schemas import PayloadRequest
+from cache_service.domain.payload import InvalidPayloadError, validate_lists
 
 REQUEST_TIMEOUT_SECONDS = 10
 
 
 def load_request(settings: CliSettings) -> PayloadRequest:
     if settings.json_data is not None:
-        return PayloadRequest.model_validate_json(settings.json_data)
-    if settings.input == STDIO:
-        return PayloadRequest.model_validate_json(sys.stdin.read())
-    assert settings.input is not None  # guaranteed by CliSettings validation
-    return PayloadRequest.model_validate_json(settings.input.read_text())
+        raw = settings.json_data
+    elif settings.input == STDIO:
+        raw = sys.stdin.read()
+    else:
+        assert settings.input is not None  # guaranteed by CliSettings validation
+        raw = settings.input.read_text()
+    request = PayloadRequest.model_validate_json(raw)
+    validate_lists(request.list_1, request.list_2)
+    return request
 
 
 def run(settings: CliSettings, client: httpx.Client, out: TextIO) -> None:
@@ -48,7 +53,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             output as out,
         ):
             run(settings, client, out)
-    except (httpx.HTTPError, ValidationError, OSError) as error:
+    except (httpx.HTTPError, ValidationError, InvalidPayloadError, OSError) as error:
         print(f"error: {error}", file=sys.stderr)
         return 1
     return 0
