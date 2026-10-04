@@ -1,0 +1,29 @@
+# Throwaway backing services for the test suite, on non-default ports so they never collide
+# with the development stack. Data lives in tmpfs and disappears on `down`.
+services:
+  postgres-test:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: cache
+      POSTGRES_PASSWORD: cache
+      POSTGRES_DB: cache_test
+    ports:
+      - "5433:5432"
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cache -d cache_test"]
+      interval: 1s
+      timeout: 3s
+      retries: 30
+
+  redis-test:
+    image: redis:7-alpine
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    ports:
+      - "6380:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 1s
+      timeout: 3s
+      retries: 30
