@@ -1,3 +1,5 @@
+"""Request and response models of the HTTP API."""
+
 from typing import Annotated
 
 from pydantic import BaseModel, Field, StringConstraints
@@ -11,14 +13,20 @@ TextList = Annotated[list[Text], Field(min_length=1, max_length=MAX_ITEMS)]
 
 
 class PayloadRequest(BaseModel):
+    """Input of payload creation: two lists of strings to interleave."""
+
     list_1: TextList
     list_2: TextList
 
 
 class PayloadCreated(BaseModel):
+    """Confirmation of payload creation."""
+
     id: str
     message: str
 
 
 class PayloadResponse(BaseModel):
+    """A generated payload."""
+
     output: str

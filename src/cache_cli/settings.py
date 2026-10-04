@@ -1,3 +1,5 @@
+"""Command line options of cache-cli."""
+
 from pathlib import Path
 from typing import Self
 
@@ -48,6 +50,12 @@ class CliSettings(BaseSettings):
     @field_validator("input")
     @classmethod
     def input_file_exists(cls, value: Path | None) -> Path | None:
+        """Ensure that an input file, if given, exists.
+
+        :param value: The ``--input`` value.
+        :return: The unchanged value.
+        :raises ValueError: If a file path was given and the file does not exist.
+        """
         if value is not None and value != STDIO and not value.is_file():
             raise ValueError(f"input file not found: {value}")
         return value
@@ -55,6 +63,12 @@ class CliSettings(BaseSettings):
     @field_validator("json_data")
     @classmethod
     def json_is_valid_request(cls, value: str | None) -> str | None:
+        """Ensure that inline JSON, if given, is a valid request body.
+
+        :param value: The ``--json`` value.
+        :return: The unchanged value.
+        :raises ValueError: If the JSON is malformed or the lists cannot be combined.
+        """
         if value is not None:
             request = PayloadRequest.model_validate_json(value)
             validate_lists(request.list_1, request.list_2)
@@ -62,6 +76,11 @@ class CliSettings(BaseSettings):
 
     @model_validator(mode="after")
     def exactly_one_input_source(self) -> Self:
+        """Ensure that exactly one of ``--input`` and ``--json`` was given.
+
+        :return: The validated settings.
+        :raises ValueError: If both or neither were given.
+        """
         if (self.input is None) == (self.json_data is None):
             raise ValueError("provide exactly one of --input or --json")
         return self

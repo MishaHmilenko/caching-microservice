@@ -1,3 +1,5 @@
+"""Redis implementation of the cache contract."""
+
 import logging
 from collections.abc import Mapping, Sequence
 
@@ -16,11 +18,17 @@ class RedisCache(Cache):
     """
 
     def __init__(self, client: Redis, ttl_seconds: int) -> None:
+        """Create the cache.
+
+        :param client: Async Redis client created with ``decode_responses=True``.
+        :param ttl_seconds: Lifetime of every entry written.
+        """
         # The client must be created with decode_responses=True so values come back as str.
         self._client = client
         self._ttl = ttl_seconds
 
     async def get(self, key: str) -> str | None:
+        """Read an entry; a Redis failure counts as a miss."""
         try:
             return await self._client.get(key)
         except RedisError:
@@ -28,6 +36,7 @@ class RedisCache(Cache):
             return None
 
     async def get_many(self, keys: Sequence[str]) -> dict[str, str]:
+        """Read entries in one round trip; a Redis failure counts as all misses."""
         if not keys:
             return {}
         try:
@@ -38,12 +47,14 @@ class RedisCache(Cache):
         return {k: v for k, v in zip(keys, values, strict=True) if v is not None}
 
     async def set(self, key: str, value: str) -> None:
+        """Write an entry with the TTL; a Redis failure is logged and ignored."""
         try:
             await self._client.set(key, value, ex=self._ttl)
         except RedisError:
             logger.warning("Cache write failed", exc_info=True)
 
     async def set_many(self, items: Mapping[str, str]) -> None:
+        """Write entries with the TTL in one round trip; a Redis failure is logged and ignored."""
         if not items:
             return
         try:

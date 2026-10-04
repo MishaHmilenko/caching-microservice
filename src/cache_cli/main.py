@@ -1,3 +1,5 @@
+"""Command line client for exercising the cache service."""
+
 import json
 import sys
 from collections.abc import Sequence
@@ -16,6 +18,14 @@ REQUEST_TIMEOUT_SECONDS = 10
 
 
 def load_request(settings: CliSettings) -> PayloadRequest:
+    """Read and validate the request body from the configured source.
+
+    :param settings: Parsed command line options.
+    :return: The validated request body.
+    :raises pydantic.ValidationError: If the body is malformed.
+    :raises InvalidPayloadError: If the lists cannot be combined.
+    :raises OSError: If the input file cannot be read.
+    """
     if settings.json_data is not None:
         raw = settings.json_data
     elif settings.input == STDIO:
@@ -29,10 +39,15 @@ def load_request(settings: CliSettings) -> PayloadRequest:
 
 
 def run(settings: CliSettings, client: httpx.Client, out: TextIO) -> None:
-    """Create the payload `repeat` times and read it back, one JSON line per iteration.
+    """Create the payload ``repeat`` times and read it back, one JSON line per iteration.
 
     Repeating the same request shows the cache at work: every iteration after the first
     should return the same id.
+
+    :param settings: Parsed command line options.
+    :param client: HTTP client pointed at the service.
+    :param out: Stream receiving one ``{"id", "output"}`` JSON line per iteration.
+    :raises httpx.HTTPError: If a request fails or the service answers with an error status.
     """
     body = load_request(settings).model_dump()
     for _ in range(settings.repeat):
@@ -45,6 +60,11 @@ def run(settings: CliSettings, client: httpx.Client, out: TextIO) -> None:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
+    """Run the command line tool.
+
+    :param argv: Command line arguments; ``sys.argv`` is used when omitted.
+    :return: Process exit code: 0 on success, 1 on any reported error.
+    """
     try:
         settings = CliApp.run(CliSettings, cli_args=list(argv) if argv is not None else None)
         output = nullcontext(sys.stdout) if settings.output == STDIO else settings.output.open("w")

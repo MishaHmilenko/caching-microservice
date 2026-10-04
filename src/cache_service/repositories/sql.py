@@ -1,3 +1,5 @@
+"""Postgres implementations of the repository contracts."""
+
 import hashlib
 from collections.abc import Mapping, Sequence
 
@@ -10,6 +12,7 @@ from cache_service.infrastructure.models import PayloadRow, TransformedStringRow
 
 
 def _digest(text: str) -> str:
+    """Return the hex SHA-256 digest used as the row key for a string."""
     return hashlib.sha256(text.encode()).hexdigest()
 
 
@@ -18,9 +21,14 @@ class SqlStringRepository(StringRepository):
     service waits on the external transformer."""
 
     def __init__(self, session_factory: async_sessionmaker[AsyncSession]) -> None:
+        """Create the repository.
+
+        :param session_factory: Factory of database sessions.
+        """
         self._session_factory = session_factory
 
     async def get_many(self, sources: Sequence[str]) -> dict[str, str]:
+        """Look up transformed strings by the digest of their source."""
         if not sources:
             return {}
         by_hash = {_digest(s): s for s in sources}
@@ -33,6 +41,7 @@ class SqlStringRepository(StringRepository):
             return {by_hash[source_hash]: result for source_hash, result in rows}
 
     async def save_many(self, results: Mapping[str, str]) -> None:
+        """Insert results, ignoring keys that another writer already stored."""
         if not results:
             return
         values = [
@@ -46,14 +55,22 @@ class SqlStringRepository(StringRepository):
 
 
 class SqlPayloadRepository(PayloadRepository):
+    """Stores payloads in Postgres, one short transaction per call."""
+
     def __init__(self, session_factory: async_sessionmaker[AsyncSession]) -> None:
+        """Create the repository.
+
+        :param session_factory: Factory of database sessions.
+        """
         self._session_factory = session_factory
 
     async def get(self, id_: str) -> str | None:
+        """Read a payload by id."""
         async with self._session_factory() as session:
             return await session.scalar(select(PayloadRow.output).where(PayloadRow.id == id_))
 
     async def save(self, id_: str, output: str) -> bool:
+        """Insert a payload; report whether this call was the one that created it."""
         statement = insert(PayloadRow).values(id=id_, output=output).on_conflict_do_nothing()
         async with self._session_factory() as session, session.begin():
             result = await session.execute(statement)

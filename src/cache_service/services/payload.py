@@ -1,3 +1,5 @@
+"""Application services implementing the use cases."""
+
 from collections.abc import Sequence
 
 from cache_service.domain.interfaces import PayloadRepository, StringRepository, Transformer
@@ -5,23 +7,40 @@ from cache_service.domain.payload import OUTPUT_SEPARATOR, interleave, payload_i
 
 
 class PayloadService:
+    """Use cases for creating and reading payloads."""
+
     def __init__(
         self,
         strings: StringRepository,
         payloads: PayloadRepository,
         transformer: Transformer,
     ) -> None:
+        """Create the service.
+
+        :param strings: Store of per-string transformer outcomes.
+        :param payloads: Store of generated payloads.
+        :param transformer: Client of the external transformer.
+        """
         self._strings = strings
         self._payloads = payloads
         self._transformer = transformer
 
     async def get_output(self, id_: str) -> str | None:
+        """Read a generated payload.
+
+        :param id_: Payload identifier.
+        :return: The payload output, or ``None`` if it does not exist.
+        """
         return await self._payloads.get(id_)
 
     async def create(self, list_1: Sequence[str], list_2: Sequence[str]) -> tuple[str, bool]:
-        """Return the payload id and whether it was newly created.
+        """Create a payload, reusing cached work wherever possible.
 
-        Raises InvalidPayloadError if the lists cannot be combined.
+        :param list_1: First list of strings.
+        :param list_2: Second list of strings.
+        :return: The payload id and whether this call newly created it.
+        :raises InvalidPayloadError: If the lists cannot be combined.
+        :raises RuntimeError: If the transformer returns the wrong number of results.
         """
         validate_lists(list_1, list_2)
         id_ = payload_id(list_1, list_2)
@@ -36,8 +55,12 @@ class PayloadService:
         return id_, created
 
     async def _transform_with_cache(self, strings: Sequence[str]) -> dict[str, str]:
-        """Map every distinct input to its transformed value, calling the transformer at most
-        once, and only for strings that have never been seen."""
+        """Transform strings, calling the transformer at most once and only for unseen ones.
+
+        :param strings: Input strings, possibly with duplicates.
+        :return: Mapping of every distinct input to its transformed value.
+        :raises RuntimeError: If the transformer returns the wrong number of results.
+        """
         distinct = list(dict.fromkeys(strings))
         results = await self._strings.get_many(distinct)
 
