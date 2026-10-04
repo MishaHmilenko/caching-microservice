@@ -1,6 +1,6 @@
 from collections.abc import Sequence
 
-from cache_service.interfaces import Transformer
+from cache_service.domain.interfaces import Transformer
 
 
 class UppercaseTransformer(Transformer):

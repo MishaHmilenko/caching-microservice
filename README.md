@@ -33,11 +33,18 @@ routes (api/)  →  PayloadService  →  interfaces (StringRepository, PayloadRe
                     RedisCache, UppercaseTransformer
 ```
 
-- `interfaces.py` — the contracts; the service depends only on these.
-- `service.py` — the business rules (id derivation, interleaving, cache-aware transforming).
-- `repositories/sql.py`, `repositories/cached.py`, `cache.py` — infrastructure.
-- `api/` — schemas, routes and the FastAPI dependency (`dependencies.py`).
-- `main.py` — composition root: the only place that picks implementations.
+```
+src/cache_service/
+  api/             HTTP layer: routes, request/response schemas, FastAPI dependency
+  services/        PayloadService: use cases, depends only on domain interfaces
+  domain/          interfaces.py (contracts) and payload.py (pure rules: id, interleaving)
+  repositories/    sql.py (Postgres) and cached.py (Redis decorator) implementations
+  infrastructure/  database setup and ORM models, Redis cache, transformer client
+  core/            configuration
+  main.py          composition root: the only place that picks implementations
+```
+
+Dependencies point inward: `api → services → domain ← repositories/infrastructure`.
 
 ## Run
 

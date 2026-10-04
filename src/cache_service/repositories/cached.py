@@ -3,7 +3,7 @@ can't tell whether a cache is involved."""
 
 from collections.abc import Mapping, Sequence
 
-from cache_service.interfaces import Cache, PayloadRepository, StringRepository
+from cache_service.domain.interfaces import Cache, PayloadRepository, StringRepository
 
 STRING_PREFIX = "string:"
 PAYLOAD_PREFIX = "payload:"

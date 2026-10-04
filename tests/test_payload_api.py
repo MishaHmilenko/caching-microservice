@@ -3,8 +3,8 @@ import asyncio
 import pytest
 from sqlalchemy import func, select
 
-from cache_service.models import PayloadRow, TransformedStringRow
-from cache_service.service import interleave, payload_id
+from cache_service.domain.payload import interleave, payload_id
+from cache_service.infrastructure.models import PayloadRow, TransformedStringRow
 
 SAMPLE = {
     "list_1": ["first string", "second string", "third string"],

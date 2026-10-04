@@ -4,7 +4,7 @@ from collections.abc import Mapping, Sequence
 from redis.asyncio import Redis
 from redis.exceptions import RedisError
 
-from cache_service.interfaces import Cache
+from cache_service.domain.interfaces import Cache
 
 logger = logging.getLogger(__name__)
 

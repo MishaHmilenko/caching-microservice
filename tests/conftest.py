@@ -15,11 +15,11 @@ from redis.asyncio import Redis
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine
 
-from cache_service.config import Settings
-from cache_service.db import create_engine, create_tables
-from cache_service.interfaces import Transformer
+from cache_service.core.config import Settings
+from cache_service.domain.interfaces import Transformer
+from cache_service.infrastructure.database import create_engine, create_tables
+from cache_service.infrastructure.models import Base
 from cache_service.main import create_app
-from cache_service.models import Base
 
 TEST_DATABASE_URL = os.environ.get(
     "TEST_DATABASE_URL", "postgresql+asyncpg://cache:cache@localhost:5433/cache_test"

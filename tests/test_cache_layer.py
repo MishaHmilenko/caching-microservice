@@ -2,7 +2,7 @@
 
 from sqlalchemy import delete
 
-from cache_service.models import PayloadRow, TransformedStringRow
+from cache_service.infrastructure.models import PayloadRow, TransformedStringRow
 
 BODY = {"list_1": ["a", "b"], "list_2": ["c", "d"]}
 

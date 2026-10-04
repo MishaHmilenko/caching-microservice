@@ -2,7 +2,7 @@ from typing import Annotated
 
 from fastapi import Depends, Request
 
-from cache_service.service import PayloadService
+from cache_service.services.payload import PayloadService
 
 
 def get_payload_service(request: Request) -> PayloadService:

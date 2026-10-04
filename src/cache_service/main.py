@@ -6,14 +6,18 @@ from fastapi import FastAPI
 from redis.asyncio import Redis
 
 from cache_service.api.routes import router
-from cache_service.cache import RedisCache
-from cache_service.config import Settings
-from cache_service.db import create_engine, create_session_factory, create_tables
-from cache_service.interfaces import Transformer
+from cache_service.core.config import Settings
+from cache_service.domain.interfaces import Transformer
+from cache_service.infrastructure.database import (
+    create_engine,
+    create_session_factory,
+    create_tables,
+)
+from cache_service.infrastructure.redis_cache import RedisCache
+from cache_service.infrastructure.transformer import UppercaseTransformer
 from cache_service.repositories.cached import CachedPayloadRepository, CachedStringRepository
 from cache_service.repositories.sql import SqlPayloadRepository, SqlStringRepository
-from cache_service.service import PayloadService
-from cache_service.transformer import UppercaseTransformer
+from cache_service.services.payload import PayloadService
 
 
 def create_app(settings: Settings | None = None, transformer: Transformer | None = None) -> FastAPI:

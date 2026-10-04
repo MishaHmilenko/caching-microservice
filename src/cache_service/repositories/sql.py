@@ -5,8 +5,8 @@ from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from cache_service.interfaces import PayloadRepository, StringRepository
-from cache_service.models import PayloadRow, TransformedStringRow
+from cache_service.domain.interfaces import PayloadRepository, StringRepository
+from cache_service.infrastructure.models import PayloadRow, TransformedStringRow
 
 
 def _digest(text: str) -> str:

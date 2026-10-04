@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 
-from cache_service.models import Base
+from cache_service.infrastructure.models import Base
 
 
 def create_engine(url: str) -> AsyncEngine:
