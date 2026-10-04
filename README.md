@@ -1,7 +1,8 @@
 # Payload cache
 
-A small FastAPI service that builds payloads from two lists of strings and caches the
-expensive per-string "transformer" call in Redis.
+A small async FastAPI service that builds payloads from two lists of strings and avoids
+repeating the expensive per-string "transformer" call. Postgres is the source of truth;
+Redis is a read-through cache in front of it.
 
 - `POST /payload` with `{"list_1": [...], "list_2": [...]}` → `201 {"id", "message"}`
   (`200` if the same payload already existed)
@@ -9,30 +10,48 @@ expensive per-string "transformer" call in Redis.
 - `GET /health`
 
 The output is the transformed strings of both lists interleaved and joined with `", "`.
-The stand-in transformer upper-cases (see `src/cache_service/transformer.py`).
+The stand-in transformer upper-cases (`src/cache_service/transformer.py`).
 
 ## How caching works
 
-- **Per-string cache** (`string:<text>` keys): every distinct string is transformed at
-  most once, ever. A request only sends strings it has not seen to the transformer, in a
-  single batched call, and makes no call at all when everything is cached.
+- **Per-string results**: every distinct string is transformed at most once, ever. A request
+  sends only unseen strings to the transformer in a single batched call, and makes no call
+  when everything is known.
 - **Payload id** is the SHA-256 of the canonical JSON of both lists, so a repeated request
-  gets the same id and is answered from the `payload:<id>` keys without any transformer work.
+  gets the same id and is answered without any transformer work.
+- **Two storage tiers**: lookups go Redis → Postgres. Misses are filled from Postgres, and
+  writes go to Postgres first and then Redis, so the cache never holds data the database
+  lacks. Cache entries expire (`CACHE_CACHE_TTL_SECONDS`); losing Redis costs latency only.
+
+## Architecture
+
+```
+routes (api/)  →  PayloadService  →  interfaces (StringRepository, PayloadRepository, Transformer)
+                                           ▲
+                    Cached*Repository ─────┤  (decorator over a repository + Cache)
+                    Sql*Repository ────────┘  (SQLAlchemy async, Postgres)
+                    RedisCache, UppercaseTransformer
+```
+
+- `interfaces.py` — the contracts; the service depends only on these.
+- `service.py` — the business rules (id derivation, interleaving, cache-aware transforming).
+- `repositories/sql.py`, `repositories/cached.py`, `cache.py` — infrastructure.
+- `api/` — schemas, routes and the FastAPI dependency (`dependencies.py`).
+- `main.py` — composition root: the only place that picks implementations.
 
 ## Run
 
 ```bash
-docker compose up --build        # service on http://localhost:8000, Redis data in a named volume
+docker compose up --build        # service on http://localhost:8000 with Postgres and Redis
 ```
 
-Locally (needs a Redis on localhost:6379):
+Locally (needs Postgres and Redis; defaults are in `config.py`, override with
+`CACHE_DATABASE_URL` / `CACHE_REDIS_URL`):
 
 ```bash
 uv sync
-uv run cache-service             # or: uv run uvicorn cache_service.main:create_app --factory
+uv run cache-service
 ```
-
-Configuration: `CACHE_REDIS_URL` (default `redis://localhost:6379/0`).
 
 ## CLI
 
@@ -54,22 +73,30 @@ back, and writes one `{"id", "output"}` JSON line. Exit code is non-zero on any 
 
 ## Tests
 
+The suite is end-to-end: it runs the real app against a separate Postgres and Redis
+(`docker-compose.test.yml`, ports 5433/6380, data in tmpfs). Only the external transformer is
+replaced, so its calls can be counted.
+
 ```bash
-uv run pytest
-uv run ruff check . && uv run ruff format --check .
+make test        # starts the test backing services, runs pytest, tears them down
+make lint
 ```
+
+To iterate faster: `make test-up`, then `uv run pytest` as often as needed, then `make test-down`.
+Override the targets with `TEST_DATABASE_URL` / `TEST_REDIS_URL`.
 
 ## Decisions and shortcuts
 
 - **`-H` for host.** The task lists `-h` for both `--host` and `--help`, which cannot coexist
   in argparse; `-h` stays help and the host gets `-H`.
-- **Redis instead of SQLite/PostgreSQL.** The task text asks for SQLite or PostgreSQL; I
-  chose Redis because the data is a pure key-value cache and needs no relational features.
-  To be confirmed with the reviewers.
+- **Redis next to Postgres.** The task asks for SQLite or PostgreSQL storage; Postgres holds
+  all durable data, and Redis is an optional accelerator, not a requirement for correctness.
+- **Table creation on startup** (`create_all`) instead of migrations — fine for two tables;
+  adopt Alembic once the schema evolves.
 - **No in-flight de-duplication.** Two simultaneous requests with the same unseen strings can
-  both call the transformer. Results are deterministic, so the duplicate writes are harmless;
-  a per-key lock or single-flight would remove the wasted call.
-- **Input limits** (1000 items, 1000 chars each) keep one request's work and key sizes bounded.
-- **Durability** relies on Redis AOF (enabled in `docker-compose.yml`); there is no eviction
-  or TTL, as results never go stale.
+  both call the transformer. Inserts use `ON CONFLICT DO NOTHING`, so the outcome is still
+  correct and exactly one request reports `201`; a per-key lock would save the wasted call.
+- **Strings are keyed by SHA-256** in Postgres, since long multibyte text can exceed B-tree
+  entry limits.
+- **Input limits** (1000 items, 1000 chars each) bound one request's work and key sizes.
 - The CLI imports the request model from the service package so both validate identically.
