@@ -12,3 +12,5 @@ class Settings(BaseSettings):
     redis_url: str = "redis://localhost:6379/0"
     # Postgres is the source of truth, so cache entries can safely expire.
     cache_ttl_seconds: int = 3600
+    # Spreads expirations so a popular batch of entries does not stampede Postgres at once.
+    cache_ttl_jitter: float = 0.1

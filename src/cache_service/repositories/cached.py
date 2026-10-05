@@ -3,6 +3,7 @@ can't tell whether a cache is involved."""
 
 from collections.abc import Iterable, Mapping, Sequence
 
+from cache_service.core.hashing import sha256_hex
 from cache_service.domain.interfaces import Cache, PayloadRepository, StringRepository
 
 STRING_PREFIX = "string:"
@@ -23,8 +24,12 @@ class CachedStringRepository(StringRepository):
 
     @staticmethod
     def _keys(sources: Iterable[str]) -> dict[str, str]:
-        """Map each source to its cache key; being a dict, it also drops duplicate sources."""
-        return {source: STRING_PREFIX + source for source in sources}
+        """Map each source to its cache key; being a dict, it also drops duplicate sources.
+
+        Keys use a digest rather than the text, so their size stays bounded no matter how long
+        the string is.
+        """
+        return {source: STRING_PREFIX + sha256_hex(source) for source in sources}
 
     @classmethod
     def _entries(cls, results: Mapping[str, str]) -> dict[str, str]:

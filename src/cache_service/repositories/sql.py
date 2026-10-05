@@ -1,19 +1,14 @@
 """Postgres implementations of the repository contracts."""
 
-import hashlib
 from collections.abc import Mapping, Sequence
 
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from cache_service.core.hashing import sha256_hex
 from cache_service.domain.interfaces import PayloadRepository, StringRepository
 from cache_service.infrastructure.models import PayloadRow, TransformedStringRow
-
-
-def _digest(text: str) -> str:
-    """Return the hex SHA-256 digest used as the row key for a string."""
-    return hashlib.sha256(text.encode()).hexdigest()
 
 
 class SqlStringRepository(StringRepository):
@@ -31,7 +26,7 @@ class SqlStringRepository(StringRepository):
         """Look up transformed strings by the digest of their source."""
         if not sources:
             return {}
-        by_hash = {_digest(s): s for s in sources}
+        by_hash = {sha256_hex(s): s for s in sources}
         async with self._session_factory() as session:
             rows = await session.execute(
                 select(TransformedStringRow.source_hash, TransformedStringRow.result).where(
@@ -45,7 +40,7 @@ class SqlStringRepository(StringRepository):
         if not results:
             return
         values = [
-            {"source_hash": _digest(source), "source": source, "result": result}
+            {"source_hash": sha256_hex(source), "source": source, "result": result}
             for source, result in results.items()
         ]
         # Results are deterministic, so a concurrent writer storing the same key is harmless.

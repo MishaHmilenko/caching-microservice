@@ -43,7 +43,7 @@ def create_app(settings: Settings | None = None, transformer: Transformer | None
         await create_tables(engine)
 
         session_factory = create_session_factory(engine)
-        cache = RedisCache(redis, settings.cache_ttl_seconds)
+        cache = RedisCache(redis, settings.cache_ttl_seconds, settings.cache_ttl_jitter)
         app.state.payload_service = PayloadService(
             strings=CachedStringRepository(SqlStringRepository(session_factory), cache),
             payloads=CachedPayloadRepository(SqlPayloadRepository(session_factory), cache),
