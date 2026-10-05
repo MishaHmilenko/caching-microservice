@@ -7,7 +7,7 @@ from collections.abc import Sequence
 from cache_service.domain.errors import (
     InvalidPayloadError,
     PayloadNotFoundError,
-    TransformerError,
+    TransformerResponseError,
 )
 from cache_service.domain.interfaces import PayloadRepository, StringRepository, Transformer
 from cache_service.domain.payload import OUTPUT_SEPARATOR, interleave
@@ -76,7 +76,7 @@ class PayloadService:
         :param list_2: Second list of strings.
         :return: The payload id and whether this call newly created it.
         :raises InvalidPayloadError: If the lists cannot be combined.
-        :raises TransformerError: If the transformer returns the wrong number of results.
+        :raises TransformerResponseError: If the transformer returns the wrong number of results.
         """
         self.validate_lists(list_1, list_2)
         id_ = self._payload_id(list_1, list_2)
@@ -95,7 +95,7 @@ class PayloadService:
 
         :param strings: Input strings, possibly with duplicates.
         :return: Mapping of every distinct input to its transformed value.
-        :raises TransformerError: If the transformer returns the wrong number of results.
+        :raises TransformerResponseError: If the transformer returns the wrong number of results.
         """
         distinct = list(dict.fromkeys(strings))
         results = await self._strings.get_many(distinct)
@@ -104,7 +104,7 @@ class PayloadService:
         if missing:
             transformed = await self._transformer.transform(missing)
             if len(transformed) != len(missing):
-                raise TransformerError("Transformer returned a different number of results")
+                raise TransformerResponseError("Transformer returned a different number of results")
             fresh = dict(zip(missing, transformed, strict=True))
             await self._strings.save_many(fresh)
             results.update(fresh)

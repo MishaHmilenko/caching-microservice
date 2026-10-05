@@ -48,16 +48,22 @@ Dependencies point inward: `api → services → domain ← repositories/infrast
 
 ## Error handling
 
-Services raise domain errors (`domain/errors.py`) and know nothing about HTTP. All translation
-happens in `api/errors.py`, registered once on the app, and every failure has the same body
-`{"detail": "..."}`:
+Intentional errors form a class hierarchy rooted at `core/exceptions.BaseError`; each class
+declares its own HTTP `status_code` and default message, and `domain/errors.py` groups them by
+business domain. A single handler on `BaseError` (`api/errors.py`) serves the whole tree, so
+adding an error means adding a class and nothing else. Every failure has the body
+`{"detail": "..."}`.
 
-| Error | Status |
-| --- | --- |
-| `InvalidPayloadError` (and request schema violations) | 422 |
-| `PayloadNotFoundError` | 404 |
-| `TransformerError` | 502 |
-| anything unexpected | 500, generic message; details only in the logs |
+```
+BaseError (500)
+├── PayloadError (400)
+│   ├── InvalidPayloadError (422)      also raised for request schema violations
+│   └── PayloadNotFoundError (404)
+└── TransformerError (502)
+    └── TransformerResponseError (502)
+```
+
+Anything outside the hierarchy becomes a generic 500; details go to the logs only.
 
 ## Run
 
