@@ -11,11 +11,7 @@ from cache_service.api.errors import register_exception_handlers
 from cache_service.api.routes import router
 from cache_service.core.config import Settings
 from cache_service.domain.interfaces import Transformer
-from cache_service.infrastructure.database import (
-    create_engine,
-    create_session_factory,
-    create_tables,
-)
+from cache_service.infrastructure.database import create_engine, create_session_factory
 from cache_service.infrastructure.redis_cache import RedisCache
 from cache_service.infrastructure.resilient_transformer import ResilientTransformer
 from cache_service.infrastructure.transformer import UppercaseTransformer
@@ -41,7 +37,6 @@ def create_app(settings: Settings | None = None, transformer: Transformer | None
         """Open the database and Redis connections for the lifetime of the app."""
         engine = create_engine(settings.database_url)
         redis = Redis.from_url(settings.redis_url, decode_responses=True)
-        await create_tables(engine)
 
         session_factory = create_session_factory(engine)
         cache = RedisCache(redis, settings.cache_ttl_seconds, settings.cache_ttl_jitter)

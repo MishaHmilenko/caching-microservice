@@ -23,6 +23,16 @@ services:
       timeout: 3s
       retries: 30
 
+  # One-shot job so the schema is migrated exactly once, however many app replicas follow.
+  migrate:
+    build: .
+    command: ["alembic", "upgrade", "head"]
+    environment:
+      CACHE_DATABASE_URL: postgresql+asyncpg://cache:cache@postgres:5432/cache
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   cache:
     build: .
     environment:
@@ -31,8 +41,8 @@ services:
     ports:
       - "8000:8000"
     depends_on:
-      postgres:
-        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
       redis:
         condition: service_healthy
 

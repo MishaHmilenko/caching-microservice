@@ -39,8 +39,8 @@ The stand-in transformer upper-cases (`src/cache_service/transformer.py`).
   conditional requests with `304`.
 - **Redis hygiene**: string keys use a digest (bounded size) and TTLs are jittered so entries
   written together do not expire together and stampede Postgres.
-- **Safe startup with several replicas**: schema creation is serialised by a Postgres
-  advisory lock (without it, 99 of 120 concurrent `create_all` calls failed in a test).
+- **Migrations, not `create_all`**: the schema is owned by Alembic. In Docker a one-shot
+  `migrate` service runs before the app starts, so replicas never race to create tables.
 
 ## Architecture
 
@@ -59,6 +59,7 @@ src/cache_service/
   domain/          interfaces.py (contracts) and errors.py (domain error hierarchy)
   repositories/    sql.py (Postgres) and cached.py (Redis decorator) implementations
   infrastructure/  database setup and ORM models, Redis cache, transformer client
+  migrations/      Alembic environment and versions (schema source of truth)
   core/            configuration
   main.py          composition root: the only place that picks implementations
 ```
@@ -96,8 +97,13 @@ Locally (needs Postgres and Redis; defaults are in `config.py`, override with
 
 ```bash
 uv sync
+uv run alembic upgrade head      # or: make migrate
 uv run cache-service
 ```
+
+Changing a model? Generate a migration with
+`uv run alembic revision --autogenerate -m "describe change"` and review it; a test fails if
+models and migrations drift apart.
 
 ## CLI
 
@@ -137,8 +143,8 @@ Override the targets with `TEST_DATABASE_URL` / `TEST_REDIS_URL`.
   in argparse; `-h` stays help and the host gets `-H`.
 - **Redis next to Postgres.** The task asks for SQLite or PostgreSQL storage; Postgres holds
   all durable data, and Redis is an optional accelerator, not a requirement for correctness.
-- **Table creation on startup** (`create_all`) instead of migrations — fine for two tables;
-  adopt Alembic once the schema evolves.
+- **Migrations run as a separate step**, never from the app, so several replicas can't race.
+  Running `alembic upgrade head` concurrently from many processes is not supported.
 - **Single-flight is per process.** Replicas can still repeat a transformer call for the same
   new string; results are deterministic and writes idempotent, so only the call is wasted.
   Closing the gap needs a distributed lock.
