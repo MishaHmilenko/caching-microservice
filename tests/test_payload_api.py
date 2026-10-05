@@ -57,11 +57,21 @@ async def test_known_strings_in_new_combination_skip_transformer(client, transfo
     assert (await client.get(f"/payload/{created.json()['id']}")).json() == {"output": "D, B, C, A"}
 
 
+UNKNOWN_ID = "0" * 64
+
+
 async def test_unknown_payload_is_404_with_error_body(client):
-    response = await client.get("/payload/nope")
+    response = await client.get(f"/payload/{UNKNOWN_ID}")
 
     assert response.status_code == 404
     assert response.json() == {"detail": "Payload not found"}
+
+
+@pytest.mark.parametrize("payload_id", ["nope", "G" * 64, "A" * 64, "0" * 63, "0" * 65])
+async def test_malformed_id_is_rejected(client, payload_id):
+    response = await client.get(f"/payload/{payload_id}")
+
+    assert response.status_code == 422
 
 
 async def test_unexpected_error_is_a_generic_500_without_internals(client_factory):

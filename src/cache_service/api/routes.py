@@ -1,11 +1,17 @@
 """HTTP endpoints."""
 
-from fastapi import APIRouter, Response, status
+from typing import Annotated
+
+from fastapi import APIRouter, Path, Response, status
 
 from cache_service.api.dependencies import PayloadServiceDep
 from cache_service.api.schemas import ErrorResponse, PayloadCreated, PayloadRequest, PayloadResponse
 
 router = APIRouter()
+
+# Ids are SHA-256 digests, so anything else cannot exist; rejecting it here keeps junk lookups
+# away from Redis and Postgres.
+PayloadId = Annotated[str, Path(pattern=r"^[0-9a-f]{64}$")]
 
 
 @router.post(
@@ -39,7 +45,7 @@ async def create_payload(
     response_model=PayloadResponse,
     responses={status.HTTP_404_NOT_FOUND: {"model": ErrorResponse}},
 )
-async def read_payload(payload_id: str, service: PayloadServiceDep) -> PayloadResponse:
+async def read_payload(payload_id: PayloadId, service: PayloadServiceDep) -> PayloadResponse:
     """Read a generated payload.
 
     :param payload_id: Identifier returned when the payload was created.
