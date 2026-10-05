@@ -26,6 +26,12 @@ class PayloadCreated(BaseModel):
     message: str
 
 
+class ErrorResponse(BaseModel):
+    """Body of every error response."""
+
+    detail: str
+
+
 class PayloadResponse(BaseModel):
     """A generated payload."""
 

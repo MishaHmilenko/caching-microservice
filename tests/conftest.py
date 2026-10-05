@@ -79,7 +79,9 @@ async def running_client(
     """An in-process app with its real lifespan (DB + Redis connections) and an HTTP client."""
     app = create_app(settings, transformer)
     async with app.router.lifespan_context(app):
-        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        async with AsyncClient(
+            transport=ASGITransport(app=app, raise_app_exceptions=False), base_url="http://test"
+        ) as client:
             yield client
 
 

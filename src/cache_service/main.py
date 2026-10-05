@@ -7,11 +7,10 @@ import uvicorn
 from fastapi import FastAPI
 from redis.asyncio import Redis
 
-from cache_service.api.errors import invalid_payload_handler
+from cache_service.api.errors import register_exception_handlers
 from cache_service.api.routes import router
 from cache_service.core.config import Settings
 from cache_service.domain.interfaces import Transformer
-from cache_service.domain.payload import InvalidPayloadError
 from cache_service.infrastructure.database import (
     create_engine,
     create_session_factory,
@@ -58,7 +57,7 @@ def create_app(settings: Settings | None = None, transformer: Transformer | None
 
     app = FastAPI(title="Payload cache", lifespan=lifespan)
     app.include_router(router)
-    app.add_exception_handler(InvalidPayloadError, invalid_payload_handler)
+    register_exception_handlers(app)
     return app
 
 

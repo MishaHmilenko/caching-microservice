@@ -1,14 +1,21 @@
 """HTTP endpoints."""
 
-from fastapi import APIRouter, HTTPException, Response, status
+from fastapi import APIRouter, Response, status
 
 from cache_service.api.dependencies import PayloadServiceDep
-from cache_service.api.schemas import PayloadCreated, PayloadRequest, PayloadResponse
+from cache_service.api.schemas import ErrorResponse, PayloadCreated, PayloadRequest, PayloadResponse
 
 router = APIRouter()
 
 
-@router.post("/payload", response_model=PayloadCreated, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/payload",
+    response_model=PayloadCreated,
+    status_code=status.HTTP_201_CREATED,
+    responses={
+        status.HTTP_502_BAD_GATEWAY: {"model": ErrorResponse},
+    },
+)
 async def create_payload(
     body: PayloadRequest, service: PayloadServiceDep, response: Response
 ) -> PayloadCreated:
@@ -27,19 +34,20 @@ async def create_payload(
     )
 
 
-@router.get("/payload/{payload_id}", response_model=PayloadResponse)
+@router.get(
+    "/payload/{payload_id}",
+    response_model=PayloadResponse,
+    responses={status.HTTP_404_NOT_FOUND: {"model": ErrorResponse}},
+)
 async def read_payload(payload_id: str, service: PayloadServiceDep) -> PayloadResponse:
     """Read a generated payload.
 
     :param payload_id: Identifier returned when the payload was created.
     :param service: Payload service.
     :return: The payload output.
-    :raises HTTPException: With status 404 if the payload does not exist.
+    :raises PayloadNotFoundError: If the payload does not exist (reported as 404).
     """
-    output = await service.get_output(payload_id)
-    if output is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Payload not found")
-    return PayloadResponse(output=output)
+    return PayloadResponse(output=await service.get_output(payload_id))
 
 
 @router.get("/health")

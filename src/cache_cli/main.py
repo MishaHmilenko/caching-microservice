@@ -12,7 +12,7 @@ from pydantic_settings import CliApp
 
 from cache_cli.settings import STDIO, CliSettings
 from cache_service.api.schemas import PayloadRequest
-from cache_service.domain.payload import InvalidPayloadError
+from cache_service.domain.errors import InvalidPayloadError
 from cache_service.services.payload import PayloadService
 
 REQUEST_TIMEOUT_SECONDS = 10

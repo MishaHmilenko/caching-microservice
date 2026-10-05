@@ -5,10 +5,6 @@ from collections.abc import Sequence
 OUTPUT_SEPARATOR = ", "
 
 
-class InvalidPayloadError(ValueError):
-    """The inputs cannot form a payload."""
-
-
 def interleave(first: Sequence[str], second: Sequence[str]) -> list[str]:
     """Alternate items from two equally long sequences, starting with ``first``.
 

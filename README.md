@@ -46,6 +46,19 @@ src/cache_service/
 
 Dependencies point inward: `api → services → domain ← repositories/infrastructure`.
 
+## Error handling
+
+Services raise domain errors (`domain/errors.py`) and know nothing about HTTP. All translation
+happens in `api/errors.py`, registered once on the app, and every failure has the same body
+`{"detail": "..."}`:
+
+| Error | Status |
+| --- | --- |
+| `InvalidPayloadError` (and request schema violations) | 422 |
+| `PayloadNotFoundError` | 404 |
+| `TransformerError` | 502 |
+| anything unexpected | 500, generic message; details only in the logs |
+
 ## Run
 
 ```bash

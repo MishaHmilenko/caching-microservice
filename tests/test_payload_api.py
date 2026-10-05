@@ -57,8 +57,23 @@ async def test_known_strings_in_new_combination_skip_transformer(client, transfo
     assert (await client.get(f"/payload/{created.json()['id']}")).json() == {"output": "D, B, C, A"}
 
 
-async def test_unknown_payload_is_404(client):
-    assert (await client.get("/payload/nope")).status_code == 404
+async def test_unknown_payload_is_404_with_error_body(client):
+    response = await client.get("/payload/nope")
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Payload nope not found"}
+
+
+async def test_unexpected_error_is_a_generic_500_without_internals(client_factory):
+    class CrashingTransformer:
+        async def transform(self, strings):
+            raise ConnectionError("secret-host:5432 refused")
+
+    async with client_factory(CrashingTransformer()) as client:
+        response = await client.post("/payload", json=SAMPLE)
+
+    assert response.status_code == 500
+    assert response.json() == {"detail": "Internal server error"}
 
 
 async def test_length_mismatch_is_rejected_by_business_rule(client, transformer):
@@ -113,14 +128,16 @@ async def test_concurrent_identical_requests_create_one_payload(client, engine):
         assert await connection.scalar(select(func.count()).select_from(PayloadRow)) == 1
 
 
-async def test_transformer_result_count_mismatch_fails_without_storing(client_factory, engine):
+async def test_transformer_result_count_mismatch_is_502_and_stores_nothing(client_factory, engine):
     class BrokenTransformer:
         async def transform(self, strings):
             return []
 
     async with client_factory(BrokenTransformer()) as client:
-        with pytest.raises(RuntimeError, match="different number"):
-            await client.post("/payload", json=SAMPLE)
+        response = await client.post("/payload", json=SAMPLE)
+
+    assert response.status_code == 502
+    assert response.json() == {"detail": "Transformer returned a different number of results"}
 
     async with engine.connect() as connection:
         assert await connection.scalar(select(func.count()).select_from(PayloadRow)) == 0

@@ -4,8 +4,13 @@ import hashlib
 import json
 from collections.abc import Sequence
 
+from cache_service.domain.errors import (
+    InvalidPayloadError,
+    PayloadNotFoundError,
+    TransformerError,
+)
 from cache_service.domain.interfaces import PayloadRepository, StringRepository, Transformer
-from cache_service.domain.payload import OUTPUT_SEPARATOR, InvalidPayloadError, interleave
+from cache_service.domain.payload import OUTPUT_SEPARATOR, interleave
 
 
 class PayloadService:
@@ -52,13 +57,17 @@ class PayloadService:
         )
         return hashlib.sha256(canonical.encode()).hexdigest()
 
-    async def get_output(self, id_: str) -> str | None:
+    async def get_output(self, id_: str) -> str:
         """Read a generated payload.
 
         :param id_: Payload identifier.
-        :return: The payload output, or ``None`` if it does not exist.
+        :return: The payload output.
+        :raises PayloadNotFoundError: If no payload exists for the identifier.
         """
-        return await self._payloads.get(id_)
+        output = await self._payloads.get(id_)
+        if output is None:
+            raise PayloadNotFoundError(f"Payload {id_} not found")
+        return output
 
     async def create(self, list_1: Sequence[str], list_2: Sequence[str]) -> tuple[str, bool]:
         """Create a payload, reusing cached work wherever possible.
@@ -67,7 +76,7 @@ class PayloadService:
         :param list_2: Second list of strings.
         :return: The payload id and whether this call newly created it.
         :raises InvalidPayloadError: If the lists cannot be combined.
-        :raises RuntimeError: If the transformer returns the wrong number of results.
+        :raises TransformerError: If the transformer returns the wrong number of results.
         """
         self.validate_lists(list_1, list_2)
         id_ = self._payload_id(list_1, list_2)
@@ -86,7 +95,7 @@ class PayloadService:
 
         :param strings: Input strings, possibly with duplicates.
         :return: Mapping of every distinct input to its transformed value.
-        :raises RuntimeError: If the transformer returns the wrong number of results.
+        :raises TransformerError: If the transformer returns the wrong number of results.
         """
         distinct = list(dict.fromkeys(strings))
         results = await self._strings.get_many(distinct)
@@ -95,7 +104,7 @@ class PayloadService:
         if missing:
             transformed = await self._transformer.transform(missing)
             if len(transformed) != len(missing):
-                raise RuntimeError("Transformer returned a different number of results")
+                raise TransformerError("Transformer returned a different number of results")
             fresh = dict(zip(missing, transformed, strict=True))
             await self._strings.save_many(fresh)
             results.update(fresh)
