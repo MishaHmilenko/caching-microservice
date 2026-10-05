@@ -11,6 +11,7 @@ from cache_service.domain.errors import (
 )
 from cache_service.domain.interfaces import PayloadRepository, StringRepository, Transformer
 from cache_service.domain.payload import OUTPUT_SEPARATOR, interleave
+from cache_service.services.single_flight import SingleFlight
 
 
 class PayloadService:
@@ -31,6 +32,7 @@ class PayloadService:
         self._strings = strings
         self._payloads = payloads
         self._transformer = transformer
+        self._flight = SingleFlight()
 
     @staticmethod
     def validate_lists(list_1: Sequence[str], list_2: Sequence[str]) -> None:
@@ -98,9 +100,20 @@ class PayloadService:
         :raises TransformerResponseError: If the transformer returns the wrong number of results.
         """
         distinct = list(dict.fromkeys(strings))
-        results = await self._strings.get_many(distinct)
+        # Concurrent requests sharing an unseen string wait for one transformer call instead
+        # of each making their own.
+        return await self._flight.run(distinct, self._load_or_transform)
 
-        missing = [s for s in distinct if s not in results]
+    async def _load_or_transform(self, strings: list[str]) -> dict[str, str]:
+        """Read known results and transform the rest, persisting what was computed.
+
+        :param strings: Distinct input strings.
+        :return: Mapping of every input to its transformed value.
+        :raises TransformerResponseError: If the transformer returns the wrong number of results.
+        """
+        results = await self._strings.get_many(strings)
+
+        missing = [s for s in strings if s not in results]
         if missing:
             transformed = await self._transformer.transform(missing)
             if len(transformed) != len(missing):

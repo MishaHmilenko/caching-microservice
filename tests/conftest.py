@@ -5,7 +5,7 @@ import os
 import socket
 import threading
 import time
-from collections.abc import AsyncIterator, Iterator, Sequence
+from collections.abc import AsyncIterator, Iterator
 from contextlib import asynccontextmanager
 
 import pytest
@@ -20,22 +20,12 @@ from cache_service.domain.interfaces import Transformer
 from cache_service.infrastructure.database import create_engine, create_tables
 from cache_service.infrastructure.models import Base
 from cache_service.main import create_app
+from fakes import CountingTransformer
 
 TEST_DATABASE_URL = os.environ.get(
     "TEST_DATABASE_URL", "postgresql+asyncpg://cache:cache@localhost:5433/cache_test"
 )
 TEST_REDIS_URL = os.environ.get("TEST_REDIS_URL", "redis://localhost:6380/0")
-
-
-class CountingTransformer(Transformer):
-    """Records every batch it receives so tests can assert on calls to the 'external service'."""
-
-    def __init__(self) -> None:
-        self.calls: list[list[str]] = []
-
-    async def transform(self, strings: Sequence[str]) -> list[str]:
-        self.calls.append(list(strings))
-        return [s.upper() for s in strings]
 
 
 @pytest.fixture
