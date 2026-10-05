@@ -3,7 +3,7 @@ import asyncio
 import pytest
 from sqlalchemy import func, select
 
-from cache_service.domain.payload import interleave, payload_id
+from cache_service.domain.payload import interleave
 from cache_service.infrastructure.models import PayloadRow, TransformedStringRow
 
 SAMPLE = {
@@ -107,7 +107,7 @@ async def test_state_survives_app_restart(client_factory, transformer):
 async def test_concurrent_identical_requests_create_one_payload(client, engine):
     responses = await asyncio.gather(*(client.post("/payload", json=SAMPLE) for _ in range(20)))
 
-    assert {r.json()["id"] for r in responses} == {payload_id(**SAMPLE)}
+    assert len({r.json()["id"] for r in responses}) == 1
     assert [r.status_code for r in responses].count(201) == 1
     async with engine.connect() as connection:
         assert await connection.scalar(select(func.count()).select_from(PayloadRow)) == 1
@@ -130,5 +130,15 @@ def test_interleave_alternates_items():
     assert interleave(["a", "b"], ["x", "y"]) == ["a", "x", "b", "y"]
 
 
-def test_payload_id_depends_on_list_boundaries():
-    assert payload_id(["a", "b"], ["c"]) != payload_id(["a"], ["b", "c"])
+@pytest.mark.parametrize(
+    ("first", "second"),
+    [
+        ({"list_1": ["a"], "list_2": ["b"]}, {"list_1": ["b"], "list_2": ["a"]}),
+        ({"list_1": ["ab"], "list_2": ["c"]}, {"list_1": ["a"], "list_2": ["bc"]}),
+    ],
+)
+async def test_different_inputs_get_different_ids(client, first, second):
+    first_id = (await client.post("/payload", json=first)).json()["id"]
+    second_id = (await client.post("/payload", json=second)).json()["id"]
+
+    assert first_id != second_id

@@ -1,9 +1,11 @@
 """Application services implementing the use cases."""
 
+import hashlib
+import json
 from collections.abc import Sequence
 
 from cache_service.domain.interfaces import PayloadRepository, StringRepository, Transformer
-from cache_service.domain.payload import OUTPUT_SEPARATOR, interleave, payload_id, validate_lists
+from cache_service.domain.payload import OUTPUT_SEPARATOR, InvalidPayloadError, interleave
 
 
 class PayloadService:
@@ -25,6 +27,31 @@ class PayloadService:
         self._payloads = payloads
         self._transformer = transformer
 
+    @staticmethod
+    def validate_lists(list_1: Sequence[str], list_2: Sequence[str]) -> None:
+        """Check that two lists can be interleaved.
+
+        :param list_1: First list of strings.
+        :param list_2: Second list of strings.
+        :raises InvalidPayloadError: If the lists differ in length.
+        """
+        # Interleaving pairs items up, so a length mismatch would silently drop data.
+        if len(list_1) != len(list_2):
+            raise InvalidPayloadError("list_1 and list_2 must have the same length")
+
+    @staticmethod
+    def _payload_id(list_1: Sequence[str], list_2: Sequence[str]) -> str:
+        """Derive the identifier from the inputs so identical requests share one payload.
+
+        :param list_1: First list of strings.
+        :param list_2: Second list of strings.
+        :return: Hex SHA-256 digest of the canonical JSON of both lists.
+        """
+        canonical = json.dumps(
+            [list(list_1), list(list_2)], ensure_ascii=False, separators=(",", ":")
+        )
+        return hashlib.sha256(canonical.encode()).hexdigest()
+
     async def get_output(self, id_: str) -> str | None:
         """Read a generated payload.
 
@@ -42,8 +69,8 @@ class PayloadService:
         :raises InvalidPayloadError: If the lists cannot be combined.
         :raises RuntimeError: If the transformer returns the wrong number of results.
         """
-        validate_lists(list_1, list_2)
-        id_ = payload_id(list_1, list_2)
+        self.validate_lists(list_1, list_2)
+        id_ = self._payload_id(list_1, list_2)
         if await self._payloads.get(id_) is not None:
             return id_, False
 

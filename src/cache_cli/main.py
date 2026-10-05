@@ -12,7 +12,8 @@ from pydantic_settings import CliApp
 
 from cache_cli.settings import STDIO, CliSettings
 from cache_service.api.schemas import PayloadRequest
-from cache_service.domain.payload import InvalidPayloadError, validate_lists
+from cache_service.domain.payload import InvalidPayloadError
+from cache_service.services.payload import PayloadService
 
 REQUEST_TIMEOUT_SECONDS = 10
 
@@ -34,7 +35,7 @@ def load_request(settings: CliSettings) -> PayloadRequest:
         assert settings.input is not None  # guaranteed by CliSettings validation
         raw = settings.input.read_text()
     request = PayloadRequest.model_validate_json(raw)
-    validate_lists(request.list_1, request.list_2)
+    PayloadService.validate_lists(request.list_1, request.list_2)
     return request
 
 

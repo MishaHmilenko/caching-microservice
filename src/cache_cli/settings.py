@@ -7,7 +7,7 @@ from pydantic import AliasChoices, AnyHttpUrl, Field, PositiveInt, field_validat
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from cache_service.api.schemas import PayloadRequest
-from cache_service.domain.payload import validate_lists
+from cache_service.services.payload import PayloadService
 
 STDIO = Path("-")
 
@@ -71,7 +71,7 @@ class CliSettings(BaseSettings):
         """
         if value is not None:
             request = PayloadRequest.model_validate_json(value)
-            validate_lists(request.list_1, request.list_2)
+            PayloadService.validate_lists(request.list_1, request.list_2)
         return value
 
     @model_validator(mode="after")
