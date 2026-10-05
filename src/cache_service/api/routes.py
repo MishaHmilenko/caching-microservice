@@ -37,6 +37,7 @@ def _etag_matches(if_none_match: str | None, etag: str) -> bool:
     status_code=status.HTTP_201_CREATED,
     responses={
         status.HTTP_502_BAD_GATEWAY: {"model": ErrorResponse},
+        status.HTTP_503_SERVICE_UNAVAILABLE: {"model": ErrorResponse},
     },
 )
 async def create_payload(

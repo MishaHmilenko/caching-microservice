@@ -17,6 +17,7 @@ from cache_service.infrastructure.database import (
     create_tables,
 )
 from cache_service.infrastructure.redis_cache import RedisCache
+from cache_service.infrastructure.resilient_transformer import ResilientTransformer
 from cache_service.infrastructure.transformer import UppercaseTransformer
 from cache_service.repositories.cached import CachedPayloadRepository, CachedStringRepository
 from cache_service.repositories.sql import SqlPayloadRepository, SqlStringRepository
@@ -47,7 +48,14 @@ def create_app(settings: Settings | None = None, transformer: Transformer | None
         app.state.payload_service = PayloadService(
             strings=CachedStringRepository(SqlStringRepository(session_factory), cache),
             payloads=CachedPayloadRepository(SqlPayloadRepository(session_factory), cache),
-            transformer=transformer or UppercaseTransformer(),
+            transformer=ResilientTransformer(
+                transformer or UppercaseTransformer(),
+                timeout_seconds=settings.transformer_timeout_seconds,
+                max_attempts=settings.transformer_max_attempts,
+                backoff_seconds=settings.transformer_backoff_seconds,
+                max_concurrency=settings.transformer_max_concurrency,
+                batch_size=settings.transformer_batch_size,
+            ),
         )
         try:
             yield

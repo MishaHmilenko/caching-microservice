@@ -14,3 +14,10 @@ class Settings(BaseSettings):
     cache_ttl_seconds: int = 3600
     # Spreads expirations so a popular batch of entries does not stampede Postgres at once.
     cache_ttl_jitter: float = 0.1
+
+    # Guards around the external transformer.
+    transformer_timeout_seconds: float = 5.0
+    transformer_max_attempts: int = 3
+    transformer_backoff_seconds: float = 0.2
+    transformer_max_concurrency: int = 4
+    transformer_batch_size: int = 100

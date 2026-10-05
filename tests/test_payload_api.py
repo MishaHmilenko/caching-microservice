@@ -114,7 +114,7 @@ async def test_malformed_id_is_rejected(client, payload_id):
 async def test_unexpected_error_is_a_generic_500_without_internals(client_factory):
     class CrashingTransformer:
         async def transform(self, strings):
-            raise ConnectionError("secret-host:5432 refused")
+            raise RuntimeError("secret-host:5432 refused")
 
     async with client_factory(CrashingTransformer()) as client:
         response = await client.post("/payload", json=SAMPLE)
@@ -186,6 +186,22 @@ async def test_transformer_result_count_mismatch_is_502_and_stores_nothing(clien
     assert response.status_code == 502
     assert response.json() == {"detail": "Transformer returned an invalid response"}
 
+    async with engine.connect() as connection:
+        assert await connection.scalar(select(func.count()).select_from(PayloadRow)) == 0
+
+
+async def test_unreachable_transformer_is_503_and_stores_nothing(client_factory, engine):
+    class Down:
+        async def transform(self, strings):
+            raise ConnectionError("down")
+
+    async with client_factory(
+        Down(), transformer_max_attempts=2, transformer_backoff_seconds=0.001
+    ) as client:
+        response = await client.post("/payload", json=SAMPLE)
+
+    assert response.status_code == 503
+    assert response.json() == {"detail": "Transformer is unavailable"}
     async with engine.connect() as connection:
         assert await connection.scalar(select(func.count()).select_from(PayloadRow)) == 0
 

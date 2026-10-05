@@ -31,6 +31,13 @@ class TransformerError(BaseError):
     default_detail = "Transformer failure"
 
 
+class TransformerUnavailableError(TransformerError):
+    """The transformer could not be reached in time, even after retrying."""
+
+    status_code = 503
+    default_detail = "Transformer is unavailable"
+
+
 class TransformerResponseError(TransformerError):
     """The transformer answered with something unusable."""
 
