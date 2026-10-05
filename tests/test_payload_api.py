@@ -61,7 +61,7 @@ async def test_unknown_payload_is_404_with_error_body(client):
     response = await client.get("/payload/nope")
 
     assert response.status_code == 404
-    assert response.json() == {"detail": "Payload nope not found"}
+    assert response.json() == {"detail": "Payload not found"}
 
 
 async def test_unexpected_error_is_a_generic_500_without_internals(client_factory):
@@ -137,7 +137,7 @@ async def test_transformer_result_count_mismatch_is_502_and_stores_nothing(clien
         response = await client.post("/payload", json=SAMPLE)
 
     assert response.status_code == 502
-    assert response.json() == {"detail": "Transformer returned a different number of results"}
+    assert response.json() == {"detail": "Transformer returned an invalid response"}
 
     async with engine.connect() as connection:
         assert await connection.scalar(select(func.count()).select_from(PayloadRow)) == 0

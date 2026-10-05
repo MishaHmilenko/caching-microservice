@@ -14,7 +14,7 @@ class InvalidPayloadError(PayloadError, ValueError):
     """The inputs cannot form a payload."""
 
     status_code = 422
-    default_detail = "Invalid payload"
+    default_detail = "list_1 and list_2 must have the same length"
 
 
 class PayloadNotFoundError(PayloadError):
