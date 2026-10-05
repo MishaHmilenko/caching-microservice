@@ -34,6 +34,11 @@ class RedisCache(Cache):
     def _expiry(self) -> int:
         """Pick a lifetime for one entry, spread around the configured TTL.
 
+        The result is uniformly distributed in ``[ttl * (1 - jitter), ttl * (1 + jitter)]``
+        and never below 1, because Redis rejects a zero or negative expiry. For example,
+        ``ttl=3600`` and ``jitter=0.1`` give 3240 to 3960 seconds. A jitter of 1 or more would
+        make the lower bound reach zero, so the floor of 1 second takes over there.
+
         :return: Seconds until expiry, at least 1.
         """
         spread = self._ttl * self._ttl_jitter
