@@ -23,6 +23,25 @@ The stand-in transformer upper-cases (`src/cache_service/transformer.py`).
   writes go to Postgres first and then Redis, so the cache never holds data the database
   lacks. Cache entries expire (`CACHE_CACHE_TTL_SECONDS`); losing Redis costs latency only.
 
+## Robustness and performance
+
+- **Single-flight** (`services/single_flight.py`): concurrent requests that miss on the same
+  string wait for one leader instead of each calling the transformer. Leader failure reaches
+  the waiting requests and clears the state; a cancelled leader is taken over by a follower.
+  Scope is per process; several replicas would need a distributed lock (`SET NX`).
+- **Guarded transformer** (`infrastructure/resilient_transformer.py`): per-attempt timeout,
+  retries with jittered exponential backoff for transient errors only, a cap on concurrent
+  upstream calls and splitting of large inputs into batches. Exhausted retries become `503`.
+- **Cheap rejection of junk**: payload ids must be 64 hex characters, so malformed lookups
+  never reach Redis or Postgres.
+- **Immutable reads**: a payload never changes for its id, so `GET /payload/{id}` sends
+  `Cache-Control: public, max-age=31536000, immutable` and an `ETag`, and answers
+  conditional requests with `304`.
+- **Redis hygiene**: string keys use a digest (bounded size) and TTLs are jittered so entries
+  written together do not expire together and stampede Postgres.
+- **Safe startup with several replicas**: schema creation is serialised by a Postgres
+  advisory lock (without it, 99 of 120 concurrent `create_all` calls failed in a test).
+
 ## Architecture
 
 ```
@@ -60,7 +79,8 @@ BaseError (500)
 │   ├── InvalidPayloadError (422)      also raised for request schema violations
 │   └── PayloadNotFoundError (404)
 └── TransformerError (502)
-    └── TransformerResponseError (502)
+    ├── TransformerResponseError (502)
+    └── TransformerUnavailableError (503)
 ```
 
 Anything outside the hierarchy becomes a generic 500; details go to the logs only.
@@ -119,9 +139,9 @@ Override the targets with `TEST_DATABASE_URL` / `TEST_REDIS_URL`.
   all durable data, and Redis is an optional accelerator, not a requirement for correctness.
 - **Table creation on startup** (`create_all`) instead of migrations — fine for two tables;
   adopt Alembic once the schema evolves.
-- **No in-flight de-duplication.** Two simultaneous requests with the same unseen strings can
-  both call the transformer. Inserts use `ON CONFLICT DO NOTHING`, so the outcome is still
-  correct and exactly one request reports `201`; a per-key lock would save the wasted call.
+- **Single-flight is per process.** Replicas can still repeat a transformer call for the same
+  new string; results are deterministic and writes idempotent, so only the call is wasted.
+  Closing the gap needs a distributed lock.
 - **Strings are keyed by SHA-256** in Postgres, since long multibyte text can exceed B-tree
   entry limits.
 - **Input limits** (1000 items, 1000 chars each) bound one request's work and key sizes.
