@@ -1,7 +1,7 @@
 """Read-through cache decorators: same interface as the wrapped repository, so the service
 can't tell whether a cache is involved."""
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 
 from cache_service.domain.interfaces import Cache, PayloadRepository, StringRepository
 
@@ -21,24 +21,34 @@ class CachedStringRepository(StringRepository):
         self._repository = repository
         self._cache = cache
 
+    @staticmethod
+    def _keys(sources: Iterable[str]) -> dict[str, str]:
+        """Map each source to its cache key; being a dict, it also drops duplicate sources."""
+        return {source: STRING_PREFIX + source for source in sources}
+
+    @classmethod
+    def _entries(cls, results: Mapping[str, str]) -> dict[str, str]:
+        """Re-key results by cache key, ready to be written to the cache."""
+        keys = cls._keys(results)
+        return {keys[source]: result for source, result in results.items()}
+
     async def get_many(self, sources: Sequence[str]) -> dict[str, str]:
         """Read from the cache, then fill the misses from the repository and cache them."""
-        # Build each key once; a dict also drops duplicate sources.
-        keys = {source: STRING_PREFIX + source for source in sources}
+        keys = self._keys(sources)
         cached = await self._cache.get_many(list(keys.values()))
         found = {source: cached[key] for source, key in keys.items() if key in cached}
 
         missing = [source for source in keys if source not in found]
         if missing:
             stored = await self._repository.get_many(missing)
-            await self._cache.set_many({keys[source]: result for source, result in stored.items()})
+            await self._cache.set_many(self._entries(stored))
             found.update(stored)
         return found
 
     async def save_many(self, results: Mapping[str, str]) -> None:
         """Persist to the repository, then cache."""
         await self._repository.save_many(results)
-        await self._cache.set_many({STRING_PREFIX + s: r for s, r in results.items()})
+        await self._cache.set_many(self._entries(results))
 
 
 class CachedPayloadRepository(PayloadRepository):
