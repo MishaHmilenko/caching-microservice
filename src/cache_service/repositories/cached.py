@@ -23,13 +23,15 @@ class CachedStringRepository(StringRepository):
 
     async def get_many(self, sources: Sequence[str]) -> dict[str, str]:
         """Read from the cache, then fill the misses from the repository and cache them."""
-        cached = await self._cache.get_many([STRING_PREFIX + s for s in sources])
-        found = {s: cached[STRING_PREFIX + s] for s in sources if STRING_PREFIX + s in cached}
+        # Build each key once; a dict also drops duplicate sources.
+        keys = {source: STRING_PREFIX + source for source in sources}
+        cached = await self._cache.get_many(list(keys.values()))
+        found = {source: cached[key] for source, key in keys.items() if key in cached}
 
-        missing = [s for s in sources if s not in found]
+        missing = [source for source in keys if source not in found]
         if missing:
             stored = await self._repository.get_many(missing)
-            await self._cache.set_many({STRING_PREFIX + s: r for s, r in stored.items()})
+            await self._cache.set_many({keys[source]: result for source, result in stored.items()})
             found.update(stored)
         return found
 
