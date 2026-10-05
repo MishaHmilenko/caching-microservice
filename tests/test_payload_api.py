@@ -60,6 +60,43 @@ async def test_known_strings_in_new_combination_skip_transformer(client, transfo
 UNKNOWN_ID = "0" * 64
 
 
+async def test_read_is_marked_immutable_and_carries_etag(client):
+    id_ = (await client.post("/payload", json=SAMPLE)).json()["id"]
+
+    response = await client.get(f"/payload/{id_}")
+
+    assert response.headers["etag"] == f'"{id_}"'
+    assert "immutable" in response.headers["cache-control"]
+
+
+@pytest.mark.parametrize("validator", ['"{id}"', 'W/"{id}"', '"other", "{id}"', "*"])
+async def test_conditional_read_returns_304_without_body(client, validator):
+    id_ = (await client.post("/payload", json=SAMPLE)).json()["id"]
+
+    response = await client.get(
+        f"/payload/{id_}", headers={"If-None-Match": validator.format(id=id_)}
+    )
+
+    assert response.status_code == 304
+    assert response.content == b""
+    assert response.headers["etag"] == f'"{id_}"'
+
+
+async def test_conditional_read_with_stale_validator_returns_body(client):
+    id_ = (await client.post("/payload", json=SAMPLE)).json()["id"]
+
+    response = await client.get(f"/payload/{id_}", headers={"If-None-Match": '"other"'})
+
+    assert response.status_code == 200
+
+
+async def test_errors_are_not_cacheable(client):
+    response = await client.get(f"/payload/{UNKNOWN_ID}", headers={"If-None-Match": "*"})
+
+    assert response.status_code == 404
+    assert "cache-control" not in response.headers
+
+
 async def test_unknown_payload_is_404_with_error_body(client):
     response = await client.get(f"/payload/{UNKNOWN_ID}")
 
