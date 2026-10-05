@@ -56,7 +56,7 @@ routes (api/)  →  PayloadService  →  interfaces (StringRepository, PayloadRe
 src/cache_service/
   api/             HTTP layer: routes, request/response schemas, FastAPI dependency
   services/        PayloadService: use cases, depends only on domain interfaces
-  domain/          interfaces.py (contracts) and payload.py (pure rules: id, interleaving)
+  domain/          interfaces.py (contracts) and errors.py (domain error hierarchy)
   repositories/    sql.py (Postgres) and cached.py (Redis decorator) implementations
   infrastructure/  database setup and ORM models, Redis cache, transformer client
   core/            configuration

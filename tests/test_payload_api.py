@@ -3,7 +3,6 @@ import asyncio
 import pytest
 from sqlalchemy import func, select
 
-from cache_service.domain.payload import interleave
 from cache_service.infrastructure.models import PayloadRow, TransformedStringRow
 
 SAMPLE = {
@@ -204,10 +203,6 @@ async def test_unreachable_transformer_is_503_and_stores_nothing(client_factory,
     assert response.json() == {"detail": "Transformer is unavailable"}
     async with engine.connect() as connection:
         assert await connection.scalar(select(func.count()).select_from(PayloadRow)) == 0
-
-
-def test_interleave_alternates_items():
-    assert interleave(["a", "b"], ["x", "y"]) == ["a", "x", "b", "y"]
 
 
 @pytest.mark.parametrize(

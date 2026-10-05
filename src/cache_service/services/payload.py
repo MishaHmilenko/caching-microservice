@@ -10,8 +10,9 @@ from cache_service.domain.errors import (
     TransformerResponseError,
 )
 from cache_service.domain.interfaces import PayloadRepository, StringRepository, Transformer
-from cache_service.domain.payload import OUTPUT_SEPARATOR, interleave
 from cache_service.services.single_flight import SingleFlight
+
+OUTPUT_SEPARATOR = ", "
 
 
 class PayloadService:
@@ -45,6 +46,17 @@ class PayloadService:
         # Interleaving pairs items up, so a length mismatch would silently drop data.
         if len(list_1) != len(list_2):
             raise InvalidPayloadError
+
+    @staticmethod
+    def _interleave(first: Sequence[str], second: Sequence[str]) -> list[str]:
+        """Alternate items from two equally long sequences, starting with ``first``.
+
+        :param first: Items taking the odd positions.
+        :param second: Items taking the even positions.
+        :return: The interleaved items.
+        :raises ValueError: If the sequences differ in length.
+        """
+        return [item for pair in zip(first, second, strict=True) for item in pair]
 
     @staticmethod
     def _payload_id(list_1: Sequence[str], list_2: Sequence[str]) -> str:
@@ -87,7 +99,7 @@ class PayloadService:
 
         results = await self._transform_with_cache([*list_1, *list_2])
         output = OUTPUT_SEPARATOR.join(
-            interleave([results[s] for s in list_1], [results[s] for s in list_2])
+            self._interleave([results[s] for s in list_1], [results[s] for s in list_2])
         )
         created = await self._payloads.save(id_, output)
         return id_, created
